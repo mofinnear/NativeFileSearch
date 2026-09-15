@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var languageObserver: NSObjectProtocol?
     private var windowObserver: NSObjectProtocol?
     private var isQuitting = false
+    private var hasPresentedInitialWindow = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -30,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         DispatchQueue.main.async { [weak self] in
             self?.protectSearchWindows()
+            self?.showInitialSearchWindow()
         }
     }
 
@@ -72,6 +74,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         for window in NSApp.windows {
             protectSearchWindow(window)
         }
+    }
+
+    private func showInitialSearchWindow(attempt: Int = 0) {
+        guard !hasPresentedInitialWindow, attempt < 20 else { return }
+
+        guard let window = NSApp.windows.first(where: {
+            $0.title == "NativeFileSearch" || $0.identifier?.rawValue == "search"
+        }) else {
+            // SwiftUI may create the WindowGroup one run-loop turn after the
+            // application delegate launches. Retry briefly instead of
+            // assuming that a missing window means a menu-bar-only launch.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.showInitialSearchWindow(attempt: attempt + 1)
+            }
+            return
+        }
+
+        hasPresentedInitialWindow = true
+        protectSearchWindow(window)
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
     }
 
     private func protectSearchWindow(_ window: NSWindow) {

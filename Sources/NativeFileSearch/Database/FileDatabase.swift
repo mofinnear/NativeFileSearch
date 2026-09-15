@@ -940,19 +940,14 @@ actor FileDatabase {
                 "files_after_delete",
                 "files_after_update"
             ].allSatisfy { try hasTrigger(connection: connection, trigger: $0) }
-            var needsRebuild = ftsVersion != Self.currentFTSVersion || !tableExists || !triggersExist
+            let needsRebuild = ftsVersion != Self.currentFTSVersion || !tableExists || !triggersExist
 
-            if !needsRebuild {
-                do {
-                    try execute(
-                        connection: connection,
-                        sql: "INSERT INTO files_fts(files_fts) VALUES ('integrity-check')"
-                    )
-                } catch {
-                    AppLogger.database.warning("SQLite FTS5 integrity check failed; rebuilding the index: \(String(describing: error), privacy: .public)")
-                    needsRebuild = true
-                }
-            }
+            // Do not run a full FTS5 integrity-check on every application
+            // launch. The trigram index can be hundreds of megabytes, and
+            // this check runs synchronously while AppState constructs the
+            // database on the main actor. A version/table/trigger check is
+            // sufficient for normal startup; full validation still runs
+            // after an FTS rebuild in prepareSearchAcceleration().
 
             if needsRebuild {
                 try execute(connection: connection, sql: "DROP TRIGGER IF EXISTS files_after_insert")

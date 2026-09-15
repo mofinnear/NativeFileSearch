@@ -249,6 +249,10 @@ actor FileIndexer {
     }
 
     private func scan(path: String, rootPath: String, pruneUnseen: Bool) async {
+        // Publish the in-progress state before touching the filesystem so the
+        // UI can explain that an empty or partial result set is temporary.
+        report(path: path, processedCount: 0, finished: false, error: nil)
+
         guard fileManager.fileExists(atPath: path) else {
             if path == rootPath,
                let location = roots.first(where: { $0.path == rootPath }) {

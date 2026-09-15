@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
 
 struct SearchWindowView: View {
@@ -11,6 +12,10 @@ struct SearchWindowView: View {
     @AppStorage("nfsShowSidebar") private var isSidebarVisible = true
     @AppStorage("nfsLanguage") private var languageRaw = AppLanguage.simplifiedChinese.rawValue
     @AppStorage("nfsOpenFileShortcut") private var openFileShortcutRaw = OpenFileShortcut.returnKey.rawValue
+    @AppStorage(FinderRevealShortcutConfiguration.keyCodeKey)
+    private var revealShortcutKeyCode = Int(FinderRevealShortcutConfiguration.defaultKeyCode)
+    @AppStorage(FinderRevealShortcutConfiguration.modifiersKey)
+    private var revealShortcutModifiers = Int(FinderRevealShortcutConfiguration.defaultModifiers)
 
     var body: some View {
         HStack(spacing: 0) {
@@ -26,6 +31,15 @@ struct SearchWindowView: View {
         .onAppear {
             selectedPath = appState.selectedResult?.fullPath
             DispatchQueue.main.async {
+                // Accessory applications do not always bring their first
+                // SwiftUI window to the front automatically. Make the
+                // initial launch discoverable without changing the later
+                // Escape-to-hide behavior.
+                let searchWindow = NSApp.windows.first {
+                    $0.title == "NativeFileSearch" || $0.identifier?.rawValue == "search"
+                }
+                NSApp.activate(ignoringOtherApps: true)
+                searchWindow?.makeKeyAndOrderFront(nil)
                 searchFieldFocused = true
             }
             appState.scheduleSearch()
@@ -157,6 +171,9 @@ struct SearchWindowView: View {
             searchArea
             Divider()
             resultHeader
+            if appState.indexingStatus.phase == .indexing {
+                indexingBanner
+            }
             resultContent
             bottomBar
         }
@@ -282,6 +299,44 @@ struct SearchWindowView: View {
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
+    private var indexingBanner: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .controlSize(.small)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(NFSLocalized.text(
+                    "正在建立索引，尚未完成",
+                    "Indexing is still in progress"
+                ))
+                    .font(.system(size: 12, weight: .semibold))
+
+                Text(NFSLocalized.text(
+                    "已处理 \(appState.indexingStatus.processedCount.formatted()) 项，搜索结果会随着扫描逐步更新。",
+                    "Processed \(appState.indexingStatus.processedCount.formatted()) items. Results will update as scanning continues."
+                ))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+        }
+        .foregroundStyle(Color.accentColor)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 8)
+        .background(
+            Color.accentColor.opacity(0.10),
+            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(Color.accentColor.opacity(0.22), lineWidth: 1)
+        )
+        .padding(.horizontal, 18)
+        .padding(.bottom, 7)
+    }
+
     @ViewBuilder
     private var resultContent: some View {
         if appState.results.isEmpty {
@@ -366,7 +421,14 @@ struct SearchWindowView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.secondary)
 
-            if hasActiveSearch && !appState.indexedLocations.isEmpty {
+            if appState.indexingStatus.phase == .indexing && !appState.indexedLocations.isEmpty {
+                Text(NFSLocalized.text(
+                    "索引还没有完成，当前显示可能不完整，请稍候。",
+                    "The index is not complete yet, so results may be incomplete. Please wait."
+                ))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
+            } else if hasActiveSearch && !appState.indexedLocations.isEmpty {
                 Text(NFSLocalized.text("试试其他名称、路径或筛选条件", "Try another name, path, or filter"))
                     .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
@@ -467,6 +529,9 @@ struct SearchWindowView: View {
         if appState.indexedLocations.isEmpty {
             return NFSLocalized.text("还没有索引位置", "No indexed locations yet")
         }
+        if appState.indexingStatus.phase == .indexing {
+            return NFSLocalized.text("索引正在建立中", "The index is still being built")
+        }
         if !hasActiveSearch && appState.stats.totalCount == 0 {
             return NFSLocalized.text("还没有索引文件", "No indexed files yet")
         }
@@ -486,7 +551,23 @@ struct SearchWindowView: View {
         let isEditingText = searchFieldFocused || firstResponder is NSTextView || firstResponder is NSTextField
         let hasMarkedText = (firstResponder as? NSTextInputClient)?.hasMarkedText() ?? false
 
+        if matchesFinderRevealShortcut(event) {
+            // A marked IME composition still owns Return. Let it finish (or
+            // cancel) before treating the same key as a Finder command.
+            guard !hasMarkedText else { return false }
+            guard let record = appState.selectedResult else { return true }
+            appState.reveal(record)
+            return true
+        }
+
         switch event.keyCode {
+        case 53: // Escape
+            // Give an active input method the first chance to cancel its
+            // marked text. Otherwise Escape dismisses the transient search
+            // window while leaving the menu-bar service and indexer running.
+            guard !hasMarkedText else { return false }
+            event.window?.orderOut(nil)
+            return true
         case 126: // Up
             guard !appState.results.isEmpty else { return false }
             moveSelection(by: -1)
@@ -525,6 +606,15 @@ struct SearchWindowView: View {
         }
     }
 
+    private func matchesFinderRevealShortcut(_ event: NSEvent) -> Bool {
+        guard UInt32(event.keyCode) == UInt32(max(0, revealShortcutKeyCode)) else {
+            return false
+        }
+
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        return carbonModifiers(for: flags) == UInt32(max(0, revealShortcutModifiers))
+    }
+
     private func moveSelection(by offset: Int) {
         guard !appState.results.isEmpty else { return }
 
@@ -549,6 +639,15 @@ struct SearchWindowView: View {
         searchFieldFocused = false
     }
 
+}
+
+private func carbonModifiers(for flags: NSEvent.ModifierFlags) -> UInt32 {
+    var modifiers: UInt32 = 0
+    if flags.contains(.command) { modifiers |= UInt32(cmdKey) }
+    if flags.contains(.shift) { modifiers |= UInt32(shiftKey) }
+    if flags.contains(.option) { modifiers |= UInt32(optionKey) }
+    if flags.contains(.control) { modifiers |= UInt32(controlKey) }
+    return modifiers
 }
 
 private struct SidebarCategoryRow: View {

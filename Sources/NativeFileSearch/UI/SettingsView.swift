@@ -12,7 +12,14 @@ struct SettingsView: View {
     @AppStorage(GlobalHotKeyConfiguration.customModifiersKey) private var customHotKeyModifiers = 0
     @AppStorage(GlobalHotKeyConfiguration.customDisplayKey) private var customHotKeyDisplay = ""
     @AppStorage("nfsOpenFileShortcut") private var openFileShortcutRaw = OpenFileShortcut.returnKey.rawValue
+    @AppStorage(FinderRevealShortcutConfiguration.keyCodeKey)
+    private var revealShortcutKeyCode = Int(FinderRevealShortcutConfiguration.defaultKeyCode)
+    @AppStorage(FinderRevealShortcutConfiguration.modifiersKey)
+    private var revealShortcutModifiers = Int(FinderRevealShortcutConfiguration.defaultModifiers)
+    @AppStorage(FinderRevealShortcutConfiguration.displayKey)
+    private var revealShortcutDisplay = ""
     @State private var isRecordingCustomHotKey = false
+    @State private var isRecordingRevealShortcut = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -137,6 +144,60 @@ struct SettingsView: View {
             }
             .padding(.bottom, 18)
 
+            VStack(alignment: .leading, spacing: 10) {
+                Text(NFSLocalized.text("Finder 显示快捷键", "Finder Reveal Shortcut"))
+                    .font(.title2.weight(.semibold))
+
+                HStack(spacing: 12) {
+                    Image(systemName: "folder.badge.magnifyingglass")
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 22)
+                    Text(NFSLocalized.text("在 Finder 中显示选中项目", "Reveal selected item in Finder"))
+                    Spacer()
+                    Button {
+                        isRecordingRevealShortcut.toggle()
+                    } label: {
+                        HStack(spacing: 7) {
+                            Image(systemName: isRecordingRevealShortcut ? "record.circle" : "keyboard")
+                            Text(
+                                isRecordingRevealShortcut
+                                    ? NFSLocalized.text("取消录制", "Cancel recording")
+                                    : revealShortcutLabel
+                            )
+                                .lineLimit(1)
+                        }
+                        .frame(minWidth: 190)
+                    }
+                    .buttonStyle(.bordered)
+
+                    if FinderRevealShortcutConfiguration.hasCustomBinding {
+                        Button {
+                            resetRevealShortcut()
+                        } label: {
+                            Image(systemName: "arrow.counterclockwise")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(NFSLocalized.text("恢复为 ⌘ 回车", "Reset to Command + Return"))
+                    }
+
+                    GlobalHotKeyCaptureView(
+                        isRecording: $isRecordingRevealShortcut,
+                        onCapture: saveRevealShortcut,
+                        onCancel: { isRecordingRevealShortcut = false }
+                    )
+                    .frame(width: 1, height: 1)
+                }
+
+                Text(NFSLocalized.text(
+                    "默认使用 Command + 回车。选中搜索结果后按下该快捷键，Finder 会打开所在目录并选中该项目；点击右侧按钮即可录制其他组合键。",
+                    "The default is Command + Return. With a result selected, it opens the containing folder in Finder and selects the item. Click the button to record another key combination."
+                ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.bottom, 18)
+
             HStack {
                 Text(NFSLocalized.text("索引位置", "Indexed Locations"))
                     .font(.title2.weight(.semibold))
@@ -234,6 +295,10 @@ struct SettingsView: View {
         .onChange(of: hotKeyPresetRaw) { _ in
             NotificationCenter.default.post(name: .nfsHotKeyConfigurationChanged, object: nil)
         }
+        .onDisappear {
+            isRecordingCustomHotKey = false
+            isRecordingRevealShortcut = false
+        }
         .onChange(of: languageRaw) { _ in
             NotificationCenter.default.post(name: .nfsLanguageChanged, object: nil)
         }
@@ -278,6 +343,13 @@ struct SettingsView: View {
             : label
     }
 
+    private var revealShortcutLabel: String {
+        let label = revealShortcutDisplay.trimmingCharacters(in: .whitespacesAndNewlines)
+        return label.isEmpty
+            ? NFSLocalized.text("⌘ 回车", "⌘ Return")
+            : label
+    }
+
     private func saveCustomHotKey(keyCode: UInt32, modifiers: UInt32, label: String) {
         GlobalHotKeyConfiguration.saveCustomBinding(
             keyCode: keyCode,
@@ -301,6 +373,26 @@ struct SettingsView: View {
             hotKeyPresetRaw = GlobalHotKeyPreset.optionSpace.rawValue
         }
         NotificationCenter.default.post(name: .nfsHotKeyConfigurationChanged, object: nil)
+    }
+
+    private func saveRevealShortcut(keyCode: UInt32, modifiers: UInt32, label: String) {
+        FinderRevealShortcutConfiguration.save(
+            keyCode: keyCode,
+            modifiers: modifiers,
+            displayName: label
+        )
+        revealShortcutKeyCode = Int(keyCode)
+        revealShortcutModifiers = Int(modifiers)
+        revealShortcutDisplay = label
+        isRecordingRevealShortcut = false
+    }
+
+    private func resetRevealShortcut() {
+        FinderRevealShortcutConfiguration.reset()
+        revealShortcutKeyCode = Int(FinderRevealShortcutConfiguration.defaultKeyCode)
+        revealShortcutModifiers = Int(FinderRevealShortcutConfiguration.defaultModifiers)
+        revealShortcutDisplay = ""
+        isRecordingRevealShortcut = false
     }
 }
 
