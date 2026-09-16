@@ -17,7 +17,7 @@ struct NativeFileSearchApp: App {
             SettingsView()
                 .environmentObject(appState)
         }
-        .defaultSize(width: 900, height: 700)
+        .defaultSize(width: 820, height: 620)
         .windowStyle(.hiddenTitleBar)
     }
 }

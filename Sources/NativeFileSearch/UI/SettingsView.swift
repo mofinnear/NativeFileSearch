@@ -62,20 +62,20 @@ struct SettingsView: View {
             Divider()
 
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 18) {
                     pageHeader
                     pageContent
                 }
-                .padding(.horizontal, 32)
-                .padding(.top, 30)
-                .padding(.bottom, 34)
+                .padding(.horizontal, 24)
+                .padding(.top, 22)
+                .padding(.bottom, 26)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .environment(\.locale, Locale(identifier: languageRaw))
-        .frame(minWidth: 860, minHeight: 650)
+        .frame(minWidth: 780, minHeight: 580)
         .onChange(of: hotKeyEnabled) { _ in
             if !hotKeyEnabled {
                 isRecordingCustomHotKey = false
@@ -114,25 +114,25 @@ struct SettingsView: View {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(Color.accentColor)
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 20, weight: .medium))
+                        .font(.system(size: 18, weight: .medium))
                         .foregroundStyle(.white)
                 }
-                .frame(width: 42, height: 42)
+                .frame(width: 36, height: 36)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("NativeFileSearch")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .lineLimit(1)
                     Text(NFSLocalized.text("应用设置", "App Settings"))
-                        .font(.system(size: 11))
+                        .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 8)
             .padding(.top, 10)
-            .padding(.bottom, 28)
+            .padding(.bottom, 20)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 ForEach(SettingsSection.allCases) { section in
                     Button {
                         withAnimation(.easeInOut(duration: 0.16)) {
@@ -141,15 +141,15 @@ struct SettingsView: View {
                     } label: {
                         HStack(spacing: 11) {
                             Image(systemName: section.icon)
-                                .font(.system(size: 15, weight: .medium))
-                                .frame(width: 21)
+                                .font(.system(size: 14, weight: .medium))
+                                .frame(width: 20)
                             Text(section.title)
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.system(size: 12, weight: .medium))
                             Spacer(minLength: 0)
                         }
                         .foregroundStyle(selectedSection == section ? .white : .primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(
                             selectedSection == section
@@ -166,7 +166,7 @@ struct SettingsView: View {
 
             Divider()
                 .padding(.horizontal, 8)
-                .padding(.bottom, 16)
+                .padding(.bottom, 12)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("NativeFileSearch")
@@ -179,18 +179,18 @@ struct SettingsView: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 10)
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 12)
-        .frame(width: 218)
+        .padding(.horizontal, 10)
+        .padding(.top, 10)
+        .frame(width: 190)
         .background(Color(nsColor: .underPageBackgroundColor).opacity(0.65))
     }
 
     private var pageHeader: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(selectedSection.title)
-                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .font(.system(size: 22, weight: .bold, design: .rounded))
             Text(selectedSection.subtitle)
-                .font(.system(size: 12))
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
     }
@@ -208,7 +208,7 @@ struct SettingsView: View {
     }
 
     private var generalPage: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             SettingsCard {
                 SettingsCardHeader(
                     icon: "globe",
@@ -221,7 +221,7 @@ struct SettingsView: View {
                 HStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(NFSLocalized.text("显示语言", "Display language"))
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                         Text(NFSLocalized.text("语言切换会立即生效。", "Changes take effect immediately."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -249,12 +249,12 @@ struct SettingsView: View {
 
                 HStack(spacing: 12) {
                     Image(systemName: "sidebar.left")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Color.accentColor)
                         .frame(width: 22)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(NFSLocalized.text("显示侧边栏", "Show sidebar"))
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                         Text(NFSLocalized.text("在搜索结果窗口左侧显示分类导航。", "Show category navigation on the left of the search window."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -272,7 +272,7 @@ struct SettingsView: View {
                         .foregroundStyle(Color.accentColor)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("NativeFileSearch")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                         Text(NFSLocalized.text(
                             "使用 SQLite 与 FSEvents 建立本地索引，搜索不依赖 Spotlight。",
                             "Uses SQLite and FSEvents for a local index. Search does not depend on Spotlight."
@@ -286,7 +286,7 @@ struct SettingsView: View {
     }
 
     private var shortcutsPage: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             SettingsCard {
                 SettingsCardHeader(
                     icon: "keyboard",
@@ -298,12 +298,12 @@ struct SettingsView: View {
 
                 HStack(spacing: 12) {
                     Image(systemName: "power")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Color.accentColor)
                         .frame(width: 22)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(NFSLocalized.text("启用全局快捷键", "Enable global shortcut"))
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                         Text(NFSLocalized.text("应用关闭窗口后仍会安静地驻留在菜单栏。", "The app stays in the menu bar after its window closes."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -317,11 +317,11 @@ struct SettingsView: View {
 
                 HStack(spacing: 12) {
                     Image(systemName: "command")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Color.accentColor)
                         .frame(width: 22)
                     Text(NFSLocalized.text("唤醒快捷键", "Wake shortcut"))
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                     Spacer(minLength: 12)
                     Picker("", selection: $hotKeyPresetRaw) {
                         ForEach(GlobalHotKeyPreset.allCases) { preset in
@@ -337,12 +337,12 @@ struct SettingsView: View {
 
                 HStack(spacing: 12) {
                     Image(systemName: "pencil.and.outline")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Color.accentColor)
                         .frame(width: 22)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(NFSLocalized.text("自定义组合键", "Custom shortcut"))
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                         Text(NFSLocalized.text("录制一个包含修饰键的组合键。", "Record a combination that includes a modifier key."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -394,12 +394,12 @@ struct SettingsView: View {
 
                 HStack(spacing: 12) {
                     Image(systemName: "arrow.turn.down.left")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Color.accentColor)
                         .frame(width: 22)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(NFSLocalized.text("打开选中的文件", "Open selected file"))
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                         Text(NFSLocalized.text("按下所选快捷键打开当前结果。", "Use the selected shortcut to open the current result."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -419,12 +419,12 @@ struct SettingsView: View {
 
                 HStack(spacing: 12) {
                     Image(systemName: "folder.badge.magnifyingglass")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Color.accentColor)
                         .frame(width: 22)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(NFSLocalized.text("在 Finder 中显示", "Reveal in Finder"))
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                         Text(NFSLocalized.text("打开所在目录并选中当前项目。", "Open the containing folder and select the item."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -466,7 +466,7 @@ struct SettingsView: View {
     }
 
     private var indexedLocationsPage: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             SettingsCard {
                 HStack(alignment: .top, spacing: 12) {
                     SettingsCardHeader(
@@ -585,7 +585,7 @@ struct SettingsView: View {
     private func metric(_ title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(value)
-                .font(.system(size: 21, weight: .semibold, design: .rounded))
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             Text(title)
@@ -679,17 +679,17 @@ private struct SettingsCard<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             content
         }
-            .padding(20)
+            .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
                     .fill(Color.white.opacity(0.035))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
                     .stroke(Color.white.opacity(0.09), lineWidth: 1)
             )
     }
@@ -706,16 +706,16 @@ private struct SettingsCardHeader: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(Color.accentColor.opacity(0.14))
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color.accentColor)
             }
-            .frame(width: 32, height: 32)
+            .frame(width: 28, height: 28)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                 Text(subtitle)
-                    .font(.system(size: 12))
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
