@@ -188,9 +188,9 @@ struct SettingsView: View {
     private var pageHeader: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(selectedSection.title)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .font(.system(size: 26, weight: .bold, design: .rounded))
             Text(selectedSection.subtitle)
-                .font(.system(size: 13))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
     }
@@ -679,8 +679,11 @@ private struct SettingsCard<Content: View>: View {
     }
 
     var body: some View {
-        content
+        VStack(alignment: .leading, spacing: 14) {
+            content
+        }
             .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 13, style: .continuous)
                     .fill(Color.white.opacity(0.035))
@@ -710,9 +713,9 @@ private struct SettingsCardHeader: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                 Text(subtitle)
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
