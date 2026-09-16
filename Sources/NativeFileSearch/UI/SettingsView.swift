@@ -2,10 +2,44 @@ import AppKit
 import Carbon.HIToolbox
 import SwiftUI
 
+private enum SettingsSection: String, CaseIterable, Identifiable {
+    case general
+    case shortcuts
+    case indexedLocations
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .general: return NFSLocalized.text("通用", "General")
+        case .shortcuts: return NFSLocalized.text("快捷键", "Shortcuts")
+        case .indexedLocations: return NFSLocalized.text("索引位置", "Indexed Locations")
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .general: return NFSLocalized.text("自定义 NativeFileSearch 的行为和外观。", "Customize how NativeFileSearch looks and behaves.")
+        case .shortcuts: return NFSLocalized.text("设置唤醒搜索和处理结果时使用的快捷键。", "Set shortcuts for waking the search window and handling results.")
+        case .indexedLocations: return NFSLocalized.text("选择需要建立本地索引的文件夹。", "Choose the folders that should be indexed locally.")
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .general: return "gearshape"
+        case .shortcuts: return "keyboard"
+        case .indexedLocations: return "folder"
+        }
+    }
+}
+
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @State private var locationToRemove: IndexedLocation?
+    @State private var selectedSection: SettingsSection = .general
     @AppStorage("nfsLanguage") private var languageRaw = AppLanguage.simplifiedChinese.rawValue
+    @AppStorage("nfsShowSidebar") private var showSidebar = true
     @AppStorage("nfsHotKeyEnabled") private var hotKeyEnabled = true
     @AppStorage("nfsHotKeyPreset") private var hotKeyPresetRaw = GlobalHotKeyPreset.optionSpace.rawValue
     @AppStorage(GlobalHotKeyConfiguration.customKeyCodeKey) private var customHotKeyKeyCode = 0
@@ -22,270 +56,26 @@ struct SettingsView: View {
     @State private var isRecordingRevealShortcut = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(NFSLocalized.text("设置", "Settings"))
-                    .font(.title2.weight(.semibold))
-                Spacer()
-                Picker(NFSLocalized.text("语言", "Language"), selection: $languageRaw) {
-                    ForEach(AppLanguage.allCases) { language in
-                        Text(language.label).tag(language.rawValue)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 190)
-            }
-            .padding(.bottom, 16)
-
-            Divider()
-                .padding(.bottom, 16)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text(NFSLocalized.text("唤醒与常驻", "Wake & Menu Bar"))
-                    .font(.title2.weight(.semibold))
-
-                HStack(spacing: 12) {
-                    Image(systemName: "keyboard")
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 22)
-                    Toggle(
-                        NFSLocalized.text("启用全局快捷键", "Enable global shortcut"),
-                        isOn: $hotKeyEnabled
-                    )
-                    Spacer()
-                    Picker(NFSLocalized.text("唤醒快捷键", "Wake shortcut"), selection: $hotKeyPresetRaw) {
-                        ForEach(GlobalHotKeyPreset.allCases) { preset in
-                            Text(preset.label).tag(preset.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 170)
-                    .disabled(!hotKeyEnabled)
-                }
-
-                HStack(spacing: 12) {
-                    Image(systemName: "pencil.and.outline")
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 22)
-                    Text(NFSLocalized.text("自定义快捷键", "Custom shortcut"))
-                    Spacer()
-                    Button {
-                        guard hotKeyEnabled else { return }
-                        isRecordingCustomHotKey.toggle()
-                    } label: {
-                        HStack(spacing: 7) {
-                            Image(systemName: isRecordingCustomHotKey ? "record.circle" : "keyboard")
-                            Text(
-                                isRecordingCustomHotKey
-                                    ? NFSLocalized.text("取消录制", "Cancel recording")
-                                    : customHotKeyLabel
-                            )
-                                .lineLimit(1)
-                        }
-                        .frame(minWidth: 190)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!hotKeyEnabled)
-
-                    if hasCustomHotKey {
-                        Button {
-                            clearCustomHotKey()
-                        } label: {
-                            Image(systemName: "xmark.circle")
-                        }
-                        .buttonStyle(.borderless)
-                        .help(NFSLocalized.text("清除自定义快捷键", "Clear custom shortcut"))
-                    }
-
-                    GlobalHotKeyCaptureView(
-                        isRecording: $isRecordingCustomHotKey,
-                        onCapture: saveCustomHotKey,
-                        onCancel: { isRecordingCustomHotKey = false }
-                    )
-                    .frame(width: 1, height: 1)
-                }
-
-                Text(NFSLocalized.text(
-                    "关闭搜索窗口后，应用仍会安静地驻留在菜单栏；点击菜单栏放大镜或使用快捷键即可再次唤醒。点击上面的自定义框后，按下任意包含修饰键的组合键即可保存。",
-                    "After the search window closes, the app stays quietly in the menu bar. Click the magnifying glass or use the shortcut to wake it. Click the custom field above, then press any combination that includes a modifier key."
-                ))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.bottom, 18)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text(NFSLocalized.text("打开文件快捷键", "Open File Shortcut"))
-                    .font(.title2.weight(.semibold))
-
-                HStack(spacing: 12) {
-                    Image(systemName: "arrow.turn.down.left")
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 22)
-                    Text(NFSLocalized.text("打开选中的文件", "Open selected file"))
-                    Spacer()
-                    Picker("", selection: $openFileShortcutRaw) {
-                        ForEach(OpenFileShortcut.allCases) { shortcut in
-                            Text(shortcut.label).tag(shortcut.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 220)
-                }
-
-                Text(NFSLocalized.text(
-                    "可选择回车，或使用更符合 macOS 习惯的 Command + O。",
-                    "Choose Return, or Command + O for a more macOS-style shortcut."
-                ))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.bottom, 18)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text(NFSLocalized.text("Finder 显示快捷键", "Finder Reveal Shortcut"))
-                    .font(.title2.weight(.semibold))
-
-                HStack(spacing: 12) {
-                    Image(systemName: "folder.badge.magnifyingglass")
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 22)
-                    Text(NFSLocalized.text("在 Finder 中显示选中项目", "Reveal selected item in Finder"))
-                    Spacer()
-                    Button {
-                        isRecordingRevealShortcut.toggle()
-                    } label: {
-                        HStack(spacing: 7) {
-                            Image(systemName: isRecordingRevealShortcut ? "record.circle" : "keyboard")
-                            Text(
-                                isRecordingRevealShortcut
-                                    ? NFSLocalized.text("取消录制", "Cancel recording")
-                                    : revealShortcutLabel
-                            )
-                                .lineLimit(1)
-                        }
-                        .frame(minWidth: 190)
-                    }
-                    .buttonStyle(.bordered)
-
-                    if FinderRevealShortcutConfiguration.hasCustomBinding {
-                        Button {
-                            resetRevealShortcut()
-                        } label: {
-                            Image(systemName: "arrow.counterclockwise")
-                        }
-                        .buttonStyle(.borderless)
-                        .help(NFSLocalized.text("恢复为 ⌘ 回车", "Reset to Command + Return"))
-                    }
-
-                    GlobalHotKeyCaptureView(
-                        isRecording: $isRecordingRevealShortcut,
-                        onCapture: saveRevealShortcut,
-                        onCancel: { isRecordingRevealShortcut = false }
-                    )
-                    .frame(width: 1, height: 1)
-                }
-
-                Text(NFSLocalized.text(
-                    "默认使用 Command + 回车。选中搜索结果后按下该快捷键，Finder 会打开所在目录并选中该项目；点击右侧按钮即可录制其他组合键。",
-                    "The default is Command + Return. With a result selected, it opens the containing folder in Finder and selects the item. Click the button to record another key combination."
-                ))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.bottom, 18)
-
-            HStack {
-                Text(NFSLocalized.text("索引位置", "Indexed Locations"))
-                    .font(.title2.weight(.semibold))
-                Spacer()
-                Button {
-                    appState.chooseFolder()
-                } label: {
-                    Label(NFSLocalized.text("添加文件夹", "Add Folder"), systemImage: "plus")
-                }
-            }
-            .padding(.bottom, 12)
-
-            List {
-                if appState.indexedLocations.isEmpty {
-                    Text(NFSLocalized.text("尚未添加索引位置", "No indexed locations yet"))
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(appState.indexedLocations) { location in
-                        IndexedLocationRow(location: location) {
-                            appState.setPaused(location, isPaused: !location.isPaused)
-                        } onRebuild: {
-                            appState.rebuild(location)
-                        } onRemove: {
-                            locationToRemove = location
-                        }
-                    }
-                }
-            }
-            .listStyle(.inset)
+        HStack(spacing: 0) {
+            settingsSidebar
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text(NFSLocalized.text("索引状态", "Index Status"))
-                    .font(.headline)
-                HStack {
-                    metric(NFSLocalized.text("文件", "Files"), value: appState.stats.fileCount.formatted())
-                    metric(NFSLocalized.text("文件夹", "Folders"), value: appState.stats.folderCount.formatted())
-                    metric(NFSLocalized.text("数据库", "Database"), value: formattedBytes(appState.stats.databaseSize))
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 24) {
+                    pageHeader
+                    pageContent
                 }
-                if let lastIndexDate = appState.indexedLocations.compactMap(\.lastScanDate).max() {
-                    Text(NFSLocalized.text(
-                        "最近索引：\(lastIndexDate.formatted(date: .abbreviated, time: .shortened))",
-                        "Last indexed: \(lastIndexDate.formatted(date: .abbreviated, time: .shortened))"
-                    ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text(NFSLocalized.text("最近索引：从未", "Last indexed: Never"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if appState.indexingStatus.phase == .indexing,
-                   let currentPath = appState.indexingStatus.currentPath {
-                    Text(NFSLocalized.indexingLocation(
-                        currentPath,
-                        count: appState.indexingStatus.processedCount.formatted()
-                    ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                if appState.indexingStatus.phase == .error,
-                   let error = appState.indexingStatus.lastError {
-                    Label(NFSLocalized.indexingWarning(error), systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .lineLimit(2)
-                }
+                .padding(.horizontal, 32)
+                .padding(.top, 30)
+                .padding(.bottom, 34)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.vertical, 14)
-
-            HStack {
-                Text(NFSLocalized.text(
-                    "NativeFileSearch 使用 SQLite 与 FSEvents 建立本地索引，搜索不依赖 Spotlight。",
-                    "NativeFileSearch builds a local index with SQLite and FSEvents. Search does not depend on Spotlight."
-                ))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                Spacer()
-                Button(NFSLocalized.text("重建全部", "Rebuild All")) {
-                    appState.rebuildAll()
-                }
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(20)
-        .frame(minWidth: 640, minHeight: 620)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .environment(\.locale, Locale(identifier: languageRaw))
+        .frame(minWidth: 860, minHeight: 650)
         .onChange(of: hotKeyEnabled) { _ in
             if !hotKeyEnabled {
                 isRecordingCustomHotKey = false
@@ -317,10 +107,487 @@ struct SettingsView: View {
         }
     }
 
+    private var settingsSidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.accentColor)
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 42, height: 42)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("NativeFileSearch")
+                        .font(.system(size: 14, weight: .semibold))
+                        .lineLimit(1)
+                    Text(NFSLocalized.text("应用设置", "App Settings"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 10)
+            .padding(.bottom, 28)
+
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(SettingsSection.allCases) { section in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.16)) {
+                            selectedSection = section
+                        }
+                    } label: {
+                        HStack(spacing: 11) {
+                            Image(systemName: section.icon)
+                                .font(.system(size: 15, weight: .medium))
+                                .frame(width: 21)
+                            Text(section.title)
+                                .font(.system(size: 13, weight: .medium))
+                            Spacer(minLength: 0)
+                        }
+                        .foregroundStyle(selectedSection == section ? .white : .primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            selectedSection == section
+                                ? Color.accentColor.opacity(0.88)
+                                : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Spacer(minLength: 20)
+
+            Divider()
+                .padding(.horizontal, 8)
+                .padding(.bottom, 16)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("NativeFileSearch")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("v\(appVersion)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 10)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 12)
+        .frame(width: 218)
+        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.65))
+    }
+
+    private var pageHeader: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(selectedSection.title)
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+            Text(selectedSection.subtitle)
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var pageContent: some View {
+        switch selectedSection {
+        case .general:
+            generalPage
+        case .shortcuts:
+            shortcutsPage
+        case .indexedLocations:
+            indexedLocationsPage
+        }
+    }
+
+    private var generalPage: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsCard {
+                SettingsCardHeader(
+                    icon: "globe",
+                    title: NFSLocalized.text("语言", "Language"),
+                    subtitle: NFSLocalized.text("选择应用的显示语言。", "Choose the display language for the app.")
+                )
+
+                Divider()
+
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(NFSLocalized.text("显示语言", "Display language"))
+                            .font(.system(size: 13, weight: .medium))
+                        Text(NFSLocalized.text("语言切换会立即生效。", "Changes take effect immediately."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 12)
+                    Picker("", selection: $languageRaw) {
+                        ForEach(AppLanguage.allCases) { language in
+                            Text(language.label).tag(language.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 190)
+                }
+            }
+
+            SettingsCard {
+                SettingsCardHeader(
+                    icon: "rectangle.leftthird.inset.filled",
+                    title: NFSLocalized.text("界面", "Interface"),
+                    subtitle: NFSLocalized.text("选择搜索窗口中需要显示的内容。", "Choose what should be visible in the search window.")
+                )
+
+                Divider()
+
+                HStack(spacing: 12) {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(NFSLocalized.text("显示侧边栏", "Show sidebar"))
+                            .font(.system(size: 13, weight: .medium))
+                        Text(NFSLocalized.text("在搜索结果窗口左侧显示分类导航。", "Show category navigation on the left of the search window."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 12)
+                    Toggle("", isOn: $showSidebar)
+                        .labelsHidden()
+                }
+            }
+
+            SettingsCard {
+                HStack(spacing: 12) {
+                    Image(systemName: "bolt.horizontal.circle")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("NativeFileSearch")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(NFSLocalized.text(
+                            "使用 SQLite 与 FSEvents 建立本地索引，搜索不依赖 Spotlight。",
+                            "Uses SQLite and FSEvents for a local index. Search does not depend on Spotlight."
+                        ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private var shortcutsPage: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsCard {
+                SettingsCardHeader(
+                    icon: "keyboard",
+                    title: NFSLocalized.text("唤醒搜索窗口", "Wake Search Window"),
+                    subtitle: NFSLocalized.text("从任何 App 快速打开搜索窗口。", "Open the search window quickly from any app.")
+                )
+
+                Divider()
+
+                HStack(spacing: 12) {
+                    Image(systemName: "power")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(NFSLocalized.text("启用全局快捷键", "Enable global shortcut"))
+                            .font(.system(size: 13, weight: .medium))
+                        Text(NFSLocalized.text("应用关闭窗口后仍会安静地驻留在菜单栏。", "The app stays in the menu bar after its window closes."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 12)
+                    Toggle("", isOn: $hotKeyEnabled)
+                        .labelsHidden()
+                }
+
+                Divider()
+
+                HStack(spacing: 12) {
+                    Image(systemName: "command")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 22)
+                    Text(NFSLocalized.text("唤醒快捷键", "Wake shortcut"))
+                        .font(.system(size: 13, weight: .medium))
+                    Spacer(minLength: 12)
+                    Picker("", selection: $hotKeyPresetRaw) {
+                        ForEach(GlobalHotKeyPreset.allCases) { preset in
+                            Text(preset.label).tag(preset.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 190)
+                    .disabled(!hotKeyEnabled)
+                }
+
+                Divider()
+
+                HStack(spacing: 12) {
+                    Image(systemName: "pencil.and.outline")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(NFSLocalized.text("自定义组合键", "Custom shortcut"))
+                            .font(.system(size: 13, weight: .medium))
+                        Text(NFSLocalized.text("录制一个包含修饰键的组合键。", "Record a combination that includes a modifier key."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 12)
+                    Button {
+                        guard hotKeyEnabled else { return }
+                        isRecordingCustomHotKey.toggle()
+                    } label: {
+                        HStack(spacing: 7) {
+                            Image(systemName: isRecordingCustomHotKey ? "record.circle" : "keyboard")
+                            Text(isRecordingCustomHotKey
+                                ? NFSLocalized.text("取消录制", "Cancel")
+                                : customHotKeyLabel)
+                                .lineLimit(1)
+                        }
+                        .frame(minWidth: 154)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!hotKeyEnabled)
+
+                    if hasCustomHotKey {
+                        Button {
+                            clearCustomHotKey()
+                        } label: {
+                            Image(systemName: "xmark.circle")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(NFSLocalized.text("清除自定义快捷键", "Clear custom shortcut"))
+                    }
+
+                    GlobalHotKeyCaptureView(
+                        isRecording: $isRecordingCustomHotKey,
+                        onCapture: saveCustomHotKey,
+                        onCancel: { isRecordingCustomHotKey = false }
+                    )
+                    .frame(width: 1, height: 1)
+                }
+            }
+
+            SettingsCard {
+                SettingsCardHeader(
+                    icon: "arrow.turn.down.left",
+                    title: NFSLocalized.text("处理搜索结果", "Handle Search Results"),
+                    subtitle: NFSLocalized.text("选择打开文件和在 Finder 中显示的方式。", "Choose how to open results or reveal them in Finder.")
+                )
+
+                Divider()
+
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.turn.down.left")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(NFSLocalized.text("打开选中的文件", "Open selected file"))
+                            .font(.system(size: 13, weight: .medium))
+                        Text(NFSLocalized.text("按下所选快捷键打开当前结果。", "Use the selected shortcut to open the current result."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 12)
+                    Picker("", selection: $openFileShortcutRaw) {
+                        ForEach(OpenFileShortcut.allCases) { shortcut in
+                            Text(shortcut.label).tag(shortcut.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 220)
+                }
+
+                Divider()
+
+                HStack(spacing: 12) {
+                    Image(systemName: "folder.badge.magnifyingglass")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(NFSLocalized.text("在 Finder 中显示", "Reveal in Finder"))
+                            .font(.system(size: 13, weight: .medium))
+                        Text(NFSLocalized.text("打开所在目录并选中当前项目。", "Open the containing folder and select the item."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 12)
+                    Button {
+                        isRecordingRevealShortcut.toggle()
+                    } label: {
+                        HStack(spacing: 7) {
+                            Image(systemName: isRecordingRevealShortcut ? "record.circle" : "keyboard")
+                            Text(isRecordingRevealShortcut
+                                ? NFSLocalized.text("取消录制", "Cancel")
+                                : revealShortcutLabel)
+                                .lineLimit(1)
+                        }
+                        .frame(minWidth: 154)
+                    }
+                    .buttonStyle(.bordered)
+
+                    if FinderRevealShortcutConfiguration.hasCustomBinding {
+                        Button {
+                            resetRevealShortcut()
+                        } label: {
+                            Image(systemName: "arrow.counterclockwise")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(NFSLocalized.text("恢复为 ⌘ 回车", "Reset to Command + Return"))
+                    }
+
+                    GlobalHotKeyCaptureView(
+                        isRecording: $isRecordingRevealShortcut,
+                        onCapture: saveRevealShortcut,
+                        onCancel: { isRecordingRevealShortcut = false }
+                    )
+                    .frame(width: 1, height: 1)
+                }
+            }
+        }
+    }
+
+    private var indexedLocationsPage: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsCard {
+                HStack(alignment: .top, spacing: 12) {
+                    SettingsCardHeader(
+                        icon: "folder",
+                        title: NFSLocalized.text("索引位置", "Indexed Locations"),
+                        subtitle: NFSLocalized.text("只会索引你主动添加的文件夹。", "Only folders you add are indexed.")
+                    )
+                    Spacer(minLength: 12)
+                    Button {
+                        appState.chooseFolder()
+                    } label: {
+                        Label(NFSLocalized.text("添加文件夹", "Add Folder"), systemImage: "plus")
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Divider()
+
+                if appState.indexedLocations.isEmpty {
+                    VStack(spacing: 9) {
+                        Image(systemName: "folder.badge.plus")
+                            .font(.system(size: 25, weight: .light))
+                            .foregroundStyle(.secondary)
+                        Text(NFSLocalized.text("还没有索引位置", "No indexed locations yet"))
+                            .font(.system(size: 13, weight: .medium))
+                        Text(NFSLocalized.text("添加一个文件夹后，应用会在后台建立本地索引。", "Add a folder and the app will build its local index in the background."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 22)
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(appState.indexedLocations) { location in
+                            IndexedLocationRow(location: location) {
+                                appState.setPaused(location, isPaused: !location.isPaused)
+                            } onRebuild: {
+                                appState.rebuild(location)
+                            } onRemove: {
+                                locationToRemove = location
+                            }
+                        }
+                    }
+                }
+            }
+
+            SettingsCard {
+                HStack(alignment: .top, spacing: 12) {
+                    SettingsCardHeader(
+                        icon: "chart.bar.xaxis",
+                        title: NFSLocalized.text("索引状态", "Index Status"),
+                        subtitle: NFSLocalized.text("索引完成后即可快速搜索文件名和路径。", "Search is ready as soon as indexing finishes.")
+                    )
+                    Spacer(minLength: 12)
+                    Button(NFSLocalized.text("重建全部", "Rebuild All")) {
+                        appState.rebuildAll()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+
+                Divider()
+
+                HStack(spacing: 0) {
+                    metric(NFSLocalized.text("文件", "Files"), value: appState.stats.fileCount.formatted())
+                    metric(NFSLocalized.text("文件夹", "Folders"), value: appState.stats.folderCount.formatted())
+                    metric(NFSLocalized.text("数据库大小", "Database"), value: formattedBytes(appState.stats.databaseSize))
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    if let lastIndexDate = lastIndexDate {
+                        Text(NFSLocalized.text(
+                            "最近索引：\(lastIndexDate.formatted(date: .abbreviated, time: .shortened))",
+                            "Last indexed: \(lastIndexDate.formatted(date: .abbreviated, time: .shortened))"
+                        ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(NFSLocalized.text("最近索引：从未", "Last indexed: Never"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if appState.indexingStatus.phase == .indexing {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            if let currentPath = appState.indexingStatus.currentPath {
+                                Text(NFSLocalized.indexingLocation(
+                                    currentPath,
+                                    count: appState.indexingStatus.processedCount.formatted()
+                                ))
+                            } else {
+                                Text(NFSLocalized.text("正在建立索引…", "Building index…"))
+                            }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
+                        .lineLimit(1)
+                    }
+
+                    if appState.indexingStatus.phase == .error,
+                       let error = appState.indexingStatus.lastError {
+                        Label(NFSLocalized.indexingWarning(error), systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .lineLimit(2)
+                    }
+                }
+            }
+        }
+    }
+
     private func metric(_ title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 5) {
             Text(value)
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .font(.system(size: 21, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
             Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -330,6 +597,14 @@ struct SettingsView: View {
 
     private func formattedBytes(_ bytes: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    private var lastIndexDate: Date? {
+        appState.indexedLocations.compactMap(\.lastScanDate).max()
+    }
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
     }
 
     private var hasCustomHotKey: Bool {
@@ -393,6 +668,55 @@ struct SettingsView: View {
         revealShortcutModifiers = Int(FinderRevealShortcutConfiguration.defaultModifiers)
         revealShortcutDisplay = ""
         isRecordingRevealShortcut = false
+    }
+}
+
+private struct SettingsCard<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(Color.white.opacity(0.035))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .stroke(Color.white.opacity(0.09), lineWidth: 1)
+            )
+    }
+}
+
+private struct SettingsCardHeader: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.14))
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+            }
+            .frame(width: 32, height: 32)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
     }
 }
 
@@ -536,47 +860,84 @@ struct IndexedLocationRow: View {
     @AppStorage("nfsLanguage") private var languageRaw = AppLanguage.simplifiedChinese.rawValue
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Image(
                 systemName: location.isPaused
                     ? "pause.circle"
                     : (location.isOffline ? "externaldrive.badge.xmark" : "folder")
             )
+                .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(
                     location.isPaused || location.isOffline
                         ? Color.secondary
                         : Color.accentColor
                 )
-                .frame(width: 22)
+                .frame(width: 24)
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(location.path)
                     .lineLimit(1)
+                    .truncationMode(.middle)
                 HStack(spacing: 6) {
                     Text(NFSLocalized.fileCount(location.fileCount.formatted()))
                     if location.isOffline {
                         Text(NFSLocalized.text("暂时离线", "Offline"))
                             .foregroundStyle(.orange)
+                    } else if location.isPaused {
+                        Text(NFSLocalized.text("已暂停", "Paused"))
+                            .foregroundStyle(.secondary)
                     }
                 }
-                    .font(.caption)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            Menu {
+                Button {
+                    onTogglePause()
+                } label: {
+                    Label(
+                        location.isPaused
+                            ? NFSLocalized.text("继续索引", "Resume Indexing")
+                            : NFSLocalized.text("暂停索引", "Pause Indexing"),
+                        systemImage: location.isPaused ? "play.fill" : "pause.fill"
+                    )
+                }
+
+                Button {
+                    onRebuild()
+                } label: {
+                    Label(NFSLocalized.text("重建此位置", "Rebuild This Location"), systemImage: "arrow.clockwise")
+                }
+
+                Divider()
+
+                Button(role: .destructive) {
+                    onRemove()
+                } label: {
+                    Label(NFSLocalized.text("移除索引位置", "Remove Indexed Location"), systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .background(Color.white.opacity(0.06), in: Circle())
             }
-            Spacer()
-            Button(
-                location.isPaused
-                    ? NFSLocalized.text("继续索引", "Resume")
-                    : NFSLocalized.text("暂停索引", "Pause"),
-                action: onTogglePause
-            )
-                .buttonStyle(.borderless)
-            Button(NFSLocalized.text("重建", "Rebuild"), action: onRebuild)
-                .buttonStyle(.borderless)
-            Button(role: .destructive, action: onRemove) {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(.borderless)
-            .help(NFSLocalized.text("从索引中移除文件夹", "Remove folder from index"))
+            .menuStyle(.borderlessButton)
+            .help(NFSLocalized.text("更多操作", "More actions"))
         }
-        .padding(.vertical, 5)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(Color.white.opacity(0.025))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        )
     }
 }
