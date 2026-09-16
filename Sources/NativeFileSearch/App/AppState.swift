@@ -64,6 +64,7 @@ final class AppState: ObservableObject {
     private let quickLookPreview = QuickLookPreviewController()
     private var searchTask: Task<Void, Never>?
     private var progressSearchTask: Task<Void, Never>?
+    private var statsRefreshTask: Task<Void, Never>?
     private var lastProgressSearchAt = Date.distantPast
     private var watcher: FileEventWatcher?
     private var progressObserver: NSObjectProtocol?
@@ -106,6 +107,7 @@ final class AppState: ObservableObject {
     deinit {
         searchTask?.cancel()
         progressSearchTask?.cancel()
+        statsRefreshTask?.cancel()
         if let progressObserver {
             NotificationCenter.default.removeObserver(progressObserver)
         }
@@ -500,10 +502,30 @@ final class AppState: ObservableObject {
         }
         scheduleSearchForProgress(progress)
         if progress.isFinished {
-            Task { [weak self] in
-                await self?.refreshLocations()
-                await self?.refreshStats()
+            // Incremental FSEvents can deliver many completed file updates
+            // in a short burst. Refreshing full-table statistics for every
+            // event creates a self-inflicted SQLite workload and can keep
+            // the app at high CPU even when indexing itself is idle.
+            scheduleStatsRefresh()
+        }
+    }
+
+    private func scheduleStatsRefresh() {
+        guard statsRefreshTask == nil else { return }
+
+        statsRefreshTask = Task { [weak self] in
+            do {
+                // Coalesce bursts of filesystem events and cap full-table
+                // statistics refreshes to roughly once per second.
+                try await Task.sleep(nanoseconds: 1_000_000_000)
+            } catch {
+                return
             }
+
+            guard !Task.isCancelled, let self else { return }
+            await self.refreshLocations()
+            await self.refreshStats()
+            self.statsRefreshTask = nil
         }
     }
 
@@ -513,14 +535,14 @@ final class AppState: ObservableObject {
 
         let now = Date()
         if progress.isFinished {
+            // A single FSEvents batch may finish many file refreshes. Debounce
+            // these notifications instead of launching one full search and
+            // facet-count query per changed path.
             progressSearchTask?.cancel()
             progressSearchTask = nil
-            lastProgressSearchAt = now
-            scheduleSearch()
-            return
+        } else {
+            guard progressSearchTask == nil else { return }
         }
-
-        guard progressSearchTask == nil else { return }
 
         let elapsed = now.timeIntervalSince(lastProgressSearchAt)
         let delay = max(0.05, 0.5 - elapsed)
